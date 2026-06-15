@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tableau de bord — Natuveris Box 2026</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f3;
+      padding: 24px;
+      min-height: 100vh;
+      color: #333;
+    }
+
+    /* ── Header ── */
+    .header { margin-bottom: 16px; }
+    .header-title { font-size: 13px; font-weight: 700; color: #1B4332; margin-bottom: 3px; }
+    .header-sub   { font-size: 9px; color: #888; }
+
+    /* ── Tabs ── */
+    .tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+    .tab-btn {
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+      cursor: pointer;
+      font-size: 9px;
+      font-weight: 700;
+      background: #fff;
+      color: #555;
+      transition: all 0.15s;
+    }
+    .tab-btn.active-delais  { background: #2980b9; color: #fff; border-color: #2980b9; box-shadow: 0 2px 8px #2980b940; }
+    .tab-btn.active-budget  { background: #534AB7; color: #fff; border-color: #534AB7; box-shadow: 0 2px 8px #534AB740; }
+    .tab-btn.active-rse     { background: #27ae60; color: #fff; border-color: #27ae60; box-shadow: 0 2px 8px #27ae6040; }
+
+    /* ── Panels ── */
+    .panel { display: none; }
+    .panel.active { display: grid; }
+
+    /* ── Card ── */
+    .card {
+      background: #fff;
+      border-radius: 10px;
+      border: 0.5px solid #e0e0e0;
+      padding: 16px 18px;
+    }
+
+    /* ── Section title ── */
+    .section-title {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 12px;
+      padding-bottom: 6px;
+      border-bottom-width: 2px;
+      border-bottom-style: solid;
+    }
+
+    /* ── Statut badge ── */
+    .badge {
+      font-size: 8px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 8px;
+      border-width: 1px;
+      border-style: solid;
+      white-space: nowrap;
+    }
+    .badge-ok      { background: #EAF3DE; color: #27500A; border-color: #27500A; }
+    .badge-warning { background: #FFF3CD; color: #7D4E00; border-color: #7D4E00; }
+    .badge-pending { background: #F5F5F3; color: #555;    border-color: #555; }
+
+    /* ── Progress bar ── */
+    .progress-track {
+      height: 8px;
+      background: #eee;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-bottom: 3px;
+    }
+    .progress-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.3s;
+    }
+
+    /* ═══════════════════════════════
+       VOLET 1 — DELAIS
+    ═══════════════════════════════ */
+    #panel-delais {
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .burndown-card { grid-column: 1 / -1; }
+
+    .chart-wrap { position: relative; width: 100%; height: 180px; }
+
+    .burndown-alert {
+      font-size: 8px;
+      color: #e67e22;
+      margin-top: 6px;
+      font-weight: 600;
+    }
+
+    /* Jalons */
+    .jalon-list { display: flex; flex-direction: column; gap: 8px; }
+    .jalon-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 8px;
+      background: #f8f9f7;
+      border-radius: 6px;
+    }
+    .jalon-info { flex: 1; }
+    .jalon-name { font-size: 9px; font-weight: 600; color: #333; margin-bottom: 2px; }
+    .jalon-date { font-size: 8px; color: #aaa; }
+
+    /* Velocite */
+    .sprint-row { margin-bottom: 8px; }
+    .sprint-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 8.5px;
+      margin-bottom: 3px;
+    }
+    .sprint-name  { font-weight: 600; color: #333; }
+    .sprint-pts   { font-weight: 700; }
+    .sprint-ok    { color: #27ae60; }
+    .sprint-fail  { color: #e74c3c; }
+    .sprint-track {
+      height: 6px;
+      background: #eee;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .sprint-fill { height: 100%; border-radius: 3px; }
+    .sprint-footer {
+      font-size: 8px;
+      color: #888;
+      margin-top: 8px;
+      border-top: 0.5px solid #eee;
+      padding-top: 6px;
+    }
+
+    /* ═══════════════════════════════
+       VOLET 2 — BUDGET
+    ═══════════════════════════════ */
+    #panel-budget {
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .livrables-card { grid-column: 1 / -1; }
+
+    /* Budget global */
+    .budget-pct {
+      text-align: center;
+      margin-bottom: 12px;
+    }
+    .budget-pct-num {
+      font-size: 28px;
+      font-weight: 700;
+      color: #534AB7;
+    }
+    .budget-pct-label { font-size: 9px; color: #888; }
+    .budget-bar-track {
+      height: 12px;
+      background: #eee;
+      border-radius: 6px;
+      overflow: hidden;
+      margin-bottom: 8px;
+    }
+    .budget-bar-fill { height: 100%; border-radius: 6px; }
+    .budget-totals {
+      display: flex;
+      justify-content: space-between;
+      font-size: 8.5px;
+    }
+    .budget-consomme { color: #534AB7; font-weight: 700; }
+    .budget-total    { color: #aaa; }
+    .budget-reste    { color: #27ae60; font-weight: 700; }
+
+    /* Alertes */
+    .alerte-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 10px;
+      border-radius: 6px;
+      margin-bottom: 6px;
+    }
+    .alerte-info { flex: 1; }
+    .alerte-label { font-size: 9px; font-weight: 600; color: #333; }
+    .alerte-seuil { font-size: 8px; color: #aaa; }
+    .alerte-valeur { font-size: 10px; font-weight: 700; }
+    .alerte-ok      { background: #f8f9f7; border: 0.5px solid #eee; }
+    .alerte-warning { background: #FFF3CD; border: 0.5px solid #EFC060; }
+    .alerte-valeur-ok      { color: #27ae60; }
+    .alerte-valeur-warning { color: #7D4E00; }
+
+    /* Livrables */
+    .livrables-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    .livrable-cell {
+      padding: 10px 12px;
+      border-radius: 8px;
+    }
+    .livrable-ok      { background: #f8f9f7; border: 0.5px solid #eee; }
+    .livrable-alerte  { background: #FFF3CD; border: 0.5px solid #EFC060; }
+    .livrable-name    { font-size: 9px; font-weight: 700; color: #333; margin-bottom: 4px; }
+    .livrable-bar-track {
+      height: 5px;
+      background: #e0e0e0;
+      border-radius: 3px;
+      margin-bottom: 5px;
+      overflow: hidden;
+    }
+    .livrable-bar-fill { height: 100%; border-radius: 3px; }
+    .livrable-totals {
+      display: flex;
+      justify-content: space-between;
+      font-size: 8px;
+    }
+    .livrable-conso { color: #534AB7; font-weight: 600; }
+    .livrable-pct   { color: #aaa; }
+    .livrable-reste { color: #27ae60; }
+
+    /* ═══════════════════════════════
+       VOLET 3 — RSE
+    ═══════════════════════════════ */
+    #panel-rse {
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .rse-full { grid-column: 1 / -1; }
+
+    /* KPI card */
+    .kpi-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .kpi-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .kpi-label { font-size: 10px; font-weight: 700; color: #1a1a1a; }
+
+    /* Jauge RSE */
+    .jauge-wrap { width: 100%; }
+    .jauge-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 4px;
+    }
+    .jauge-val  { font-size: 11px; font-weight: 700; }
+    .jauge-cible { font-size: 9px; color: #aaa; }
+    .jauge-footer { font-size: 8px; color: #aaa; margin-top: 3px; text-align: right; }
+
+    /* Seuils RSE */
+    .seuils-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+    .seuil-cell {
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: #f8f9f7;
+      border: 0.5px solid #eee;
+    }
+    .seuil-si    { font-size: 8.5px; font-weight: 700; color: #333; margin-bottom: 5px; }
+    .seuil-alors { font-size: 8.5px; color: #555; line-height: 1.5; }
+
+    /* ── Responsive ── */
+    @media (max-width: 640px) {
+      body { padding: 12px; }
+
+      #panel-delais,
+      #panel-budget,
+      #panel-rse {
+        grid-template-columns: 1fr;
+      }
+      .burndown-card,
+      .livrables-card,
+      .rse-full { grid-column: 1; }
+
+      .livrables-grid { grid-template-columns: 1fr 1fr; }
+      .seuils-grid    { grid-template-columns: 1fr; }
+
+      .tabs { gap: 6px; }
+      .tab-btn { font-size: 8px; padding: 6px 10px; }
+    }
+
+    @media (max-width: 400px) {
+      .livrables-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── HEADER ─────────────────────────────── -->
+<div class="header">
+  <div class="header-title">Tableau de bord projet : Natuveris Box 2026</div>
+  <div class="header-sub">Agence Horizon · Bloc 4 Q2.2 · Mise à jour : hebdomadaire (délais et budget) · bimestrielle (RSE)</div>
+</div>
+
+<!-- ── TABS ───────────────────────────────── -->
+<div class="tabs">
+  <button class="tab-btn active-delais" onclick="switchTab('delais')" id="btn-delais">Volet 1 : Pilotage délais</button>
+  <button class="tab-btn" onclick="switchTab('budget')" id="btn-budget">Volet 2 : Pilotage budget</button>
+  <button class="tab-btn" onclick="switchTab('rse')" id="btn-rse">Volet 3 : RSE et engagement</button>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     VOLET 1 — DÉLAIS
+════════════════════════════════════════════ -->
+<div id="panel-delais" class="panel active">
+
+  <!-- Burndown -->
+  <div class="card burndown-card">
+    <div class="section-title" style="color:#2980b9; border-bottom-color:#2980b9;">Courbe d'épuisement (Burndown)</div>
+    <div class="chart-wrap">
+      <canvas id="burndownChart"></canvas>
+    </div>
+    <div class="burndown-alert">
+      Écart sprint S4 : +9 points vs trajectoire idéale. Seuil d'alerte franchi si écart supérieur à 15 points sur 2 sprints consécutifs.
+    </div>
+  </div>
+
+  <!-- Jalons -->
+  <div class="card">
+    <div class="section-title" style="color:#2980b9; border-bottom-color:#2980b9;">Avancement des jalons</div>
+    <div class="jalon-list" id="jalons-list"></div>
+  </div>
+
+  <!-- Vélocité -->
+  <div class="card">
+    <div class="section-title" style="color:#2980b9; border-bottom-color:#2980b9;">Vélocité par sprint</div>
+    <div id="velocite-list"></div>
+    <div class="sprint-footer">Cible : 12 points/sprint · Vélocité moyenne actuelle : 11,5 pts</div>
+  </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════
+     VOLET 2 — BUDGET
+════════════════════════════════════════════ -->
+<div id="panel-budget" class="panel">
+
+  <!-- Budget global -->
+  <div class="card">
+    <div class="section-title" style="color:#534AB7; border-bottom-color:#534AB7;">Budget global consommé</div>
+    <div class="budget-pct">
+      <div class="budget-pct-num" id="budget-pct-num"></div>
+      <div class="budget-pct-label">consommé</div>
+    </div>
+    <div class="budget-bar-track">
+      <div class="budget-bar-fill" id="budget-bar-fill"></div>
+    </div>
+    <div class="budget-totals">
+      <span class="budget-consomme" id="budget-consomme"></span>
+      <span class="budget-total" id="budget-total"></span>
+      <span class="budget-reste" id="budget-reste"></span>
+    </div>
+  </div>
+
+  <!-- Alertes -->
+  <div class="card">
+    <div class="section-title" style="color:#534AB7; border-bottom-color:#534AB7;">Alertes budgétaires</div>
+    <div id="alertes-list"></div>
+  </div>
+
+  <!-- Livrables -->
+  <div class="card livrables-card">
+    <div class="section-title" style="color:#534AB7; border-bottom-color:#534AB7;">Coût par livrable</div>
+    <div class="livrables-grid" id="livrables-grid"></div>
+  </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════
+     VOLET 3 — RSE
+════════════════════════════════════════════ -->
+<div id="panel-rse" class="panel">
+
+  <!-- KPI 1 : tCO2 évitées -->
+  <div class="card">
+    <div class="kpi-header">
+      <div class="kpi-dot" style="background:#27ae60;"></div>
+      <div class="kpi-label">tCO2 évitées</div>
+    </div>
+    <div class="jauge-wrap">
+      <div class="jauge-header">
+        <span class="jauge-val" style="color:#27ae60;">3.2t</span>
+        <span class="jauge-cible">Cible : 6t</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" style="width:53%; background:#27ae60;"></div>
+      </div>
+      <div class="jauge-footer">53% de l'objectif</div>
+    </div>
+  </div>
+
+  <!-- KPI 2 : Part fournisseurs inclusifs (ESAT) -->
+  <div class="card">
+    <div class="kpi-header">
+      <div class="kpi-dot" style="background:#2980b9;"></div>
+      <div class="kpi-label">Part fournisseurs inclusifs (ESAT)</div>
+    </div>
+    <div class="jauge-wrap">
+      <div class="jauge-header">
+        <span class="jauge-val" style="color:#2980b9;">7%</span>
+        <span class="jauge-cible">Cible : 10%</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" style="width:70%; background:#2980b9;"></div>
+      </div>
+      <div class="jauge-footer">70% de l'objectif</div>
+    </div>
+  </div>
+
+  <!-- KPI 3 : Score satisfaction équipes -->
+  <div class="card">
+    <div class="kpi-header">
+      <div class="kpi-dot" style="background:#8e44ad;"></div>
+      <div class="kpi-label">Score satisfaction équipes</div>
+    </div>
+    <div class="jauge-wrap">
+      <div class="jauge-header">
+        <span class="jauge-val" style="color:#8e44ad;">3.8/5</span>
+        <span class="jauge-cible">Cible : 4.5/5</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" style="width:84%; background:#8e44ad;"></div>
+      </div>
+      <div class="jauge-footer">84% de l'objectif</div>
+    </div>
+  </div>
+
+  <!-- KPI 4 : Conformité WCAG 2.1 AA -->
+  <div class="card">
+    <div class="kpi-header">
+      <div class="kpi-dot" style="background:#16a085;"></div>
+      <div class="kpi-label">Conformité WCAG 2.1 AA</div>
+    </div>
+    <div class="jauge-wrap">
+      <div class="jauge-header">
+        <span class="jauge-val" style="color:#16a085;">94%</span>
+        <span class="jauge-cible">Cible : 100%</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" style="width:94%; background:#16a085;"></div>
+      </div>
+      <div class="jauge-footer">94% de l'objectif</div>
+    </div>
+  </div>
+
+  <!-- Seuils -->
+  <div class="card rse-full">
+    <div class="section-title" style="color:#27ae60; border-bottom-color:#27ae60;">Seuils d'alerte RSE et actions déclenchées</div>
+    <div class="seuils-grid" id="seuils-grid"></div>
+  </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════
+     VANILLA JS
+════════════════════════════════════════════ -->
+<script>
+/* ── DATA ─────────────────────────────────── */
+const burndownData = [
+  { sprint: "S1", ideale: 100, reelle: 100 },
+  { sprint: "S2", ideale: 88,  reelle: 90  },
+  { sprint: "S3", ideale: 75,  reelle: 80  },
+  { sprint: "S4", ideale: 63,  reelle: 72  },
+  { sprint: "S5", ideale: 50,  reelle: 58  },
+  { sprint: "S6", ideale: 38,  reelle: 40  },
+  { sprint: "S7", ideale: 25,  reelle: 28  },
+  { sprint: "S8", ideale: 13,  reelle: null },
+  { sprint: "S9", ideale: 0,   reelle: null },
+];
+
+const jalons = [
+  { nom: "Kick-off et RACI validée",         date: "Jan 2026", statut: "ok"      },
+  { nom: "UUID unifié et PredictX connecté", date: "Fév 2026", statut: "ok"      },
+  { nom: "POC PredictX go/no-go",            date: "Mar 2026", statut: "warning" },
+  { nom: "Feature store RecommAI actif",     date: "Avr 2026", statut: "pending" },
+  { nom: "Extension RecommAI T2",            date: "Mai 2026", statut: "pending" },
+  { nom: "Bilan semestriel S1",              date: "Juin 2026", statut: "pending"},
+];
+
+const sprints = [
+  { sprint: "Sprint 1", points: 11, cible: 12 },
+  { sprint: "Sprint 2", points: 10, cible: 12 },
+  { sprint: "Sprint 3", points:  9, cible: 12 },
+  { sprint: "Sprint 4", points: 13, cible: 12 },
+  { sprint: "Sprint 5", points: 12, cible: 12 },
+  { sprint: "Sprint 6", points: 14, cible: 12 },
+];
+
+const livrables = [
+  { nom: "Campagnes Meta et Google S1",  budget: 18000, consomme: 14200 },
+  { nom: "POC PredictX (additionnel)",   budget: 12100, consomme:  8600 },
+  { nom: "Partenariats influenceurs",    budget: 12000, consomme:  9800 },
+  { nom: "Production contenus studio",  budget: 14000, consomme:  7200 },
+  { nom: "Relations presse",            budget:  8000, consomme:  5100 },
+  { nom: "Événementiel et salons",      budget:  5000, consomme:  2400 },
+];
+
+const alertes = [
+  { label: "CAC Meta Ads",          valeur: "74 €",   seuil: "80 €",  statut: "ok"      },
+  { label: "CAC Google Ads",        valeur: "36 €",   seuil: "40 €",  statut: "warning" },
+  { label: "Taux de rétention",     valeur: "76 %",   seuil: "73 %",  statut: "ok"      },
+  { label: "Écart budget PredictX", valeur: "3,2 %",  seuil: "5 %",   statut: "ok"      },
+];
+
+const rseKpis = [
+  { label: "tCO2 évitées",                   valeur: 3.2, cible: 6.0, unite: "t",   color: "#27ae60", bg: "#EAF3DE" },
+  { label: "Part fournisseurs inclusifs (ESAT)", valeur: 7, cible: 10, unite: "%",  color: "#2980b9", bg: "#E6F1FB" },
+  { label: "Score satisfaction équipes",     valeur: 3.8, cible: 4.5, unite: "/5",  color: "#8e44ad", bg: "#EEEDFE" },
+  { label: "Conformité WCAG 2.1 AA",         valeur: 94,  cible: 100, unite: "%",   color: "#16a085", bg: "#E1F5EE" },
+];
+
+const seuils = [
+  {
+    kpi:    "tCO2 évitées inférieur à 50 % de la cible à mi-parcours",
+    action: "Revue des fournisseurs avec RSE et Qualité · Audit empreinte carbone commandes ESAT",
+  },
+  {
+    kpi:    "Part ESAT inférieure à 8 % deux mois consécutifs",
+    action: "Plan de rattrapage en COPIL mensuel · Révision contrat cadre ESAT avant bilan semestriel",
+  },
+  {
+    kpi:    "Score satisfaction inférieur à 3/5 deux bimestres consécutifs",
+    action: "Déclenchement seuil d'alerte R9 · Repriorisation backlog Data sans attendre le COPIL",
+  },
+  {
+    kpi:    "Conformité WCAG inférieure à 100 % sur un envoi POC",
+    action: "Blocage mise en production · Correction IT/PWA sous 48h · RSE et Qualité valide avant relance",
+  },
+];
+
+/* ── HELPER ───────────────────────────────── */
+const fr = n => n.toLocaleString("fr-FR");
+
+/* ── TABS ─────────────────────────────────── */
+const tabs = ["delais", "budget", "rse"];
+const tabColors = { delais: "#2980b9", budget: "#534AB7", rse: "#27ae60" };
+
+function switchTab(id) {
+  tabs.forEach(t => {
+    document.getElementById("panel-" + t).classList.remove("active");
+    const btn = document.getElementById("btn-" + t);
+    btn.classList.remove("active-delais", "active-budget", "active-rse");
+  });
+  document.getElementById("panel-" + id).classList.add("active");
+  document.getElementById("btn-" + id).classList.add("active-" + id);
+}
+
+/* ══════════════════════════════════════════
+   VOLET 1 — BUILD
+══════════════════════════════════════════ */
+
+/* Burndown chart (Chart.js) */
+(function buildBurndown() {
+  const labels  = burndownData.map(d => d.sprint);
+  const ideale  = burndownData.map(d => d.ideale);
+  const reelle  = burndownData.map(d => d.reelle);
+
+  new Chart(document.getElementById("burndownChart"), {
+    type: "line",
+    data: {
+      labels,
+      datasets: [
+        {
+          label: "Idéale",
+          data: ideale,
+          borderColor: "#ddd",
+          borderDash: [5, 4],
+          borderWidth: 1.5,
+          pointRadius: 0,
+          tension: 0.1,
+          spanGaps: false,
+        },
+        {
+          label: "Réelle",
+          data: reelle,
+          borderColor: "#2980b9",
+          borderWidth: 2,
+          pointRadius: 3,
+          pointBackgroundColor: "#2980b9",
+          tension: 0.1,
+          spanGaps: false,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: {
+          labels: { font: { size: 9 }, boxWidth: 16 },
+        },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              const v = ctx.raw;
+              return v !== null ? `${ctx.dataset.label} : ${v}%` : "À venir";
+            },
+          },
+        },
+      },
+      scales: {
+        x: { ticks: { font: { size: 9 } }, grid: { display: false } },
+        y: {
+          ticks: {
+            font: { size: 9 },
+            callback: v => v + "%",
+          },
+          min: 0, max: 100,
+        },
+      },
+    },
+  });
+})();
+
+/* Jalons */
+(function buildJalons() {
+  const map = {
+    ok:      { cls: "badge-ok",      label: "Terminé"  },
+    warning: { cls: "badge-warning", label: "En cours" },
+    pending: { cls: "badge-pending", label: "À venir"  },
+  };
+  const el = document.getElementById("jalons-list");
+  el.innerHTML = jalons.map(j => `
+    <div class="jalon-row">
+      <div class="jalon-info">
+        <div class="jalon-name">${j.nom}</div>
+        <div class="jalon-date">${j.date}</div>
+      </div>
+      <span class="badge ${map[j.statut].cls}">${map[j.statut].label}</span>
+    </div>
+  `).join("");
+})();
+
+/* Vélocité */
+(function buildVelocite() {
+  const el = document.getElementById("velocite-list");
+  el.innerHTML = sprints.map(s => {
+    const ok  = s.points >= s.cible;
+    const pct = Math.min((s.points / 16) * 100, 100);
+    return `
+      <div class="sprint-row">
+        <div class="sprint-header">
+          <span class="sprint-name">${s.sprint}</span>
+          <span class="sprint-pts ${ok ? "sprint-ok" : "sprint-fail"}">${s.points} pts</span>
+        </div>
+        <div class="sprint-track">
+          <div class="sprint-fill" style="width:${pct}%; background:${ok ? "#27ae60" : "#e74c3c"};"></div>
+        </div>
+      </div>`;
+  }).join("");
+})();
+
+/* ══════════════════════════════════════════
+   VOLET 2 — BUILD
+══════════════════════════════════════════ */
+(function buildBudget() {
+  const totalBudget   = 98000 + 12100;
+  const totalConsomme = livrables.reduce((a, l) => a + l.consomme, 0);
+  const pct           = Math.round((totalConsomme / totalBudget) * 100);
+  const barColor      = pct > 80 ? "#e74c3c" : pct > 60 ? "#e67e22" : "#534AB7";
+
+  document.getElementById("budget-pct-num").textContent  = pct + "%";
+  document.getElementById("budget-bar-fill").style.cssText =
+    `width:${pct}%; background:${barColor};`;
+  document.getElementById("budget-consomme").textContent = fr(totalConsomme) + " €";
+  document.getElementById("budget-total").textContent    = "sur " + fr(totalBudget) + " €";
+  document.getElementById("budget-reste").textContent    = "Reste : " + fr(totalBudget - totalConsomme) + " €";
+
+  /* Alertes */
+  document.getElementById("alertes-list").innerHTML = alertes.map(a => `
+    <div class="alerte-row alerte-${a.statut}">
+      <div class="alerte-info">
+        <div class="alerte-label">${a.label}</div>
+        <div class="alerte-seuil">Seuil : ${a.seuil}</div>
+      </div>
+      <span class="alerte-valeur alerte-valeur-${a.statut}">${a.valeur}</span>
+    </div>
+  `).join("");
+
+  /* Livrables */
+  document.getElementById("livrables-grid").innerHTML = livrables.map(l => {
+    const p      = Math.round((l.consomme / l.budget) * 100);
+    const alerte = p > 85;
+    return `
+      <div class="livrable-cell ${alerte ? "livrable-alerte" : "livrable-ok"}">
+        <div class="livrable-name">${l.nom}</div>
+        <div class="livrable-bar-track">
+          <div class="livrable-bar-fill" style="width:${p}%; background:${alerte ? "#e67e22" : "#534AB7"};"></div>
+        </div>
+        <div class="livrable-totals">
+          <span class="livrable-conso">${fr(l.consomme)} €</span>
+          <span class="livrable-pct">${p}%</span>
+          <span class="livrable-reste">Reste : ${fr(l.budget - l.consomme)} €</span>
+        </div>
+      </div>`;
+  }).join("");
+})();
+
+/* ══════════════════════════════════════════
+   VOLET 3 — SEUILS (KPI cards en HTML statique)
+══════════════════════════════════════════ */
+(function buildSeuils() {
+  document.getElementById("seuils-grid").innerHTML = seuils.map(s => `
+    <div class="seuil-cell">
+      <div class="seuil-si">Si : ${s.kpi}</div>
+      <div class="seuil-alors">Alors : ${s.action}</div>
+    </div>
+  `).join("");
+})();
+</script>
+</body>
+</html>
